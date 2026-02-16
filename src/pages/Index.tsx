@@ -11,7 +11,7 @@ const Dashboard = () => {
       <main className="container py-8 max-w-3xl">
         {/* Hero */}
         <div className="mb-8 animate-fade-in">
-          <h1 className="text-2xl font-bold mb-1">Good morning 👋</h1>
+          <h1 className="text-2xl font-bold mb-1">Welcome Back </h1>
           <p className="text-muted-foreground text-sm">Here's what's happening with your stocks today.</p>
         </div>
 
@@ -33,7 +33,7 @@ const Dashboard = () => {
 
         {/* Footer disclaimer */}
         <p className="text-center text-[11px] text-muted-foreground mt-12">
-          FinBud is for educational purposes only. Not financial advice. All data is simulated.
+          FinBud Insights provides forecasts based on historical data and AI analysis. Always do your own research before making investment decisions.
         </p>
       </main>
     </div>
