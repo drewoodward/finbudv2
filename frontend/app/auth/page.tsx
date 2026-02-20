@@ -4,20 +4,12 @@ import Link from 'next/link'
 const auth = () => {
   return (
     <div>
-      <h1 className="text-4xl font-bold">Login/Sign Up</h1>
-      <form>
-        <div>
-          <label htmlFor="email">Email:</label>
-          <input type="email" id="email" name="email" required />
-        </div>
-        <div>
-          <label htmlFor="password">Password:</label>
-          <input type="password" id="password" name="password" required />
-        </div>
-        <Link href="../dashboard">
-          <button type="button">Submit</button>
+        <Link href="/auth/login">
+          <button type="button">Login</button>
         </Link>
-      </form>
+        <Link href="/auth/signup">
+          <button type="button">Sign Up</button>
+        </Link>
     </div>
   )
 }
