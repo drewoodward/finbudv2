@@ -1,5 +1,6 @@
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Float, DateTime
 from database import Base
+from datetime import datetime 
 
 class Account(Base):
     __tablename__ = "account"
@@ -8,7 +9,7 @@ class Account(Base):
     username = Column(String, unique=True, index=True)
     password = Column(String)
     email = Column(String, unique=True)
-    created_at = Column(DateTime, default=DateTime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
     is_active = Column(Boolean, default=True)
 
 class Stock(Base):
@@ -21,7 +22,7 @@ class Stock(Base):
     industry = Column(String)
     market_cap = Column(Float)
     current_price = Column(Float)
-    last_updated = Column(DateTime, default=DateTime.utcnow)
+    last_updated = Column(DateTime, default=datetime.utcnow)
 
 class StockHistory(Base):
     __tablename__ = "stock_history"
@@ -41,7 +42,7 @@ class WatchList(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, ForeignKey("account.username"))
     stock_ticker = Column(String, ForeignKey("stock.stock_ticker"))
-    added_at = Column(DateTime, default=DateTime.utcnow)
+    added_at = Column(DateTime, default=datetime.utcnow)
     #UniqueConstraint('username_id', 'stock_ticker_id', name='unique_watchlist_entry')
 
 class Prediction(Base):
@@ -53,7 +54,7 @@ class Prediction(Base):
     predicted_price = Column(Float)
     prediction_date = Column(DateTime)
     confidence = Column(Float)
-    prediction_timestamp = Column(DateTime, default=DateTime.utcnow)
+    prediction_timestamp = Column(DateTime, default=datetime.utcnow)
 
 class Portfolio(Base):
     __tablename__ = "portfolio"
@@ -63,4 +64,4 @@ class Portfolio(Base):
     stock_ticker = Column(String, ForeignKey("stock.stock_ticker"))
     quantity = Column(Float)
     average_price = Column(Float)
-    purchase_date = Column(DateTime, default=DateTime.utcnow)
+    purchase_date = Column(DateTime, default=datetime.utcnow)
