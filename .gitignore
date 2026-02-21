@@ -1,0 +1,5 @@
+.DS_Store
+backend_database/.env
+backend_database/__pycache__/
+frontend/.next/
+*.pyc
