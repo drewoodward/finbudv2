@@ -6,6 +6,7 @@ from datetime import datetime
 import model
 from database import SessionLocal, engine
 from sqlalchemy.orm import Session
+import time
 
 from ai_service import get_gemini_explanation  # NEW: Import the AI function we made
 
@@ -21,6 +22,10 @@ app.add_middleware(
 )
 
 # model.Base.metadata.create_all(bind=engine)
+
+# --- NEWS CACHE ---
+news_cache: dict = {}
+CACHE_TTL_SECONDS = 60
 
 # --- EXISTING MODELS ---
 class AccountBase(BaseModel):
@@ -122,19 +127,31 @@ async def analyze_stock_explanation(request: AnalyzeRequest):
     
     return {"explanation": explanation}
 
-# -- NEWS ENDPOINT -- 
+# -- NEWS ENDPOINT --
 
 @app.get("/api/news")
-def get_news():
+def get_news(ticker: str = "SPY"):
     import yfinance as yf
-    # Pull news from a broad market ticker
-    ticker = yf.Ticker("SPY")
-    news = ticker.news[:6]  # top 6 stories
-    return {"news": [
+
+    # Return cached result if it's still fresh
+    if ticker in news_cache:
+        cached = news_cache[ticker]
+        if time.time() - cached["timestamp"] < CACHE_TTL_SECONDS:
+            return {"news": cached["data"]}
+
+    # Otherwise fetch fresh from yfinance
+    stock = yf.Ticker(ticker)
+    news = stock.news[:6]
+    result = [
         {
             "title": item.get("content", {}).get("title", ""),
             "url": item.get("content", {}).get("canonicalUrl", {}).get("url", ""),
             "publisher": item.get("content", {}).get("provider", {}).get("displayName", ""),
         }
         for item in news
-    ]}
+    ]
+
+    # Store in cache with current timestamp
+    news_cache[ticker] = {"data": result, "timestamp": time.time()}
+
+    return {"news": result}
