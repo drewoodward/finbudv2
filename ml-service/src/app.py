@@ -1,7 +1,8 @@
 from flask import Flask
 from flask_cors import CORS
-from routes.predictions import predictions_bp
+#from routes.stock_prediction import predictions_bp
 from routes.yahoo_proxy import yahoo_bp
+from routes.stock_prediction import stock_prediction_bp
 import sys
 import os
 
@@ -11,7 +12,7 @@ def create_app():
     app = Flask(__name__)
     
     # Enable CORS for frontend
-    CORS(app, resources={r"/*": {"origins": ["http://localhost:8080", "http://localhost:8081", "http://localhost:5173"]}})
+    CORS(app, resources={r"/*": {"origins": ["http://localhost:8080", "http://localhost:8081", "http://localhost:5173", "http://localhost:3000"]}})
     
     try:
         from config import Config
@@ -20,8 +21,9 @@ def create_app():
         app.config['DEBUG'] = True
     
     # Register blueprints
-    app.register_blueprint(predictions_bp)
+    #app.register_blueprint(predictions_bp)
     app.register_blueprint(yahoo_bp)
+    app.register_blueprint(stock_prediction_bp)
     
     return app
 
@@ -31,4 +33,7 @@ if __name__ == '__main__':
     print("📊 Model loaded and ready for predictions")
     print("🌐 API available at http://localhost:5001")
     print("✅ CORS enabled + Yahoo Finance proxy")
+    print("🎯 Stock prediction endpoints:")
+    print("   - GET  /api/predict/<symbol>")
+    print("   - POST /api/predict-batch")
     app.run(host='0.0.0.0', port=5001, debug=True)
