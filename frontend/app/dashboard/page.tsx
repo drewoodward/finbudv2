@@ -28,6 +28,16 @@ const INITIAL_TICKERS: Ticker[] = [
   { symbol: "META",  price: "Loading...", signal: "HOLD", conf: 50, trend: "flat" },
 ];
 
+const COMPANY_NAMES: Record<string, string> = {
+  MSFT: "microsoft",
+  NVDA: "nvidia",
+  GOOGL: "alphabet",
+  AAPL: "apple",
+  TSLA: "tesla",
+  AMZN: "amazon",
+  META: "meta",
+};
+
 const SIGNAL_COLORS: Record<string, { bg: string; text: string; glow: string }> = {
   BUY:  { bg: "linear-gradient(145deg,#7c3aed,#4c1d95)", text: "white", glow: "rgba(124,58,237,0.35)" },
   HOLD: { bg: "linear-gradient(145deg,#9ca3af,#6b7280)", text: "white", glow: "rgba(107,114,128,0.25)" },
@@ -47,10 +57,10 @@ function determineTrend(signal: string, confidence: number): "up" | "down" | "fl
 }
 
 export default function DashboardPage() {
-  const [activeIdx, setActiveIdx] = useState(3); // AAPL default
+  const [activeIdx, setActiveIdx] = useState(3);
   const [tickers, setTickers] = useState<Ticker[]>(INITIAL_TICKERS);
   const [loading, setLoading] = useState(true);
-  const [news, setNews] = useState<NewsItem[]>([]); // ← news state lives here
+  const [news, setNews] = useState<NewsItem[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Fetch live prices and ML predictions
@@ -89,18 +99,30 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch real news from backend
-  useEffect(() => {
-    fetch("http://127.0.0.1:8000/api/news")
-      .then(res => res.json())
-      .then(data => setNews(data.news))
-      .catch(() => console.log("News fetch failed"));
-  }, []);
-
   const prev = () => setActiveIdx((i) => Math.max(0, i - 1));
   const next = () => setActiveIdx((i) => Math.min(tickers.length - 1, i + 1));
 
-  const activeTicker = tickers[activeIdx];
+  const activeTicker = tickers[activeIdx] ?? tickers[0];
+
+  // Fetch news for active ticker — re-runs when ticker changes
+  useEffect(() => {
+    setNews([]);
+    fetch(`http://127.0.0.1:8000/api/news?ticker=${activeTicker.symbol}`)
+      .then(res => res.json())
+      .then(data => setNews(data.news))
+      .catch(() => console.log("News fetch failed"));
+  }, [activeTicker.symbol]);
+
+  // Filter news to only show articles mentioning the company
+  const filteredNews = news.filter(item => {
+    const title = item.title.toLowerCase();
+    const symbol = activeTicker.symbol.toLowerCase();
+    const companyName = COMPANY_NAMES[activeTicker.symbol] ?? symbol;
+    return title.includes(symbol) || title.includes(companyName);
+  });
+
+  // Fall back to unfiltered if nothing matched
+  const displayNews = filteredNews.length > 0 ? filteredNews.slice(0, 3) : news.slice(0, 3);
 
   const visibleRange = 1;
   const visible = tickers.map((t, i) => ({
@@ -222,7 +244,7 @@ export default function DashboardPage() {
                 return (
                   <div
                     key={ticker.symbol}
-                    onClick={() => !isCenter && setActiveIdx(i + (activeIdx - visibleRange))}
+                    onClick={() => !isCenter && setActiveIdx(activeIdx + ticker.offset)}
                     style={{
                       position: "absolute", top: "50%", left: "50%",
                       width: `${cardW}px`, height: `${cardH}px`,
@@ -273,10 +295,10 @@ export default function DashboardPage() {
           {/* Quick News */}
           <div style={{ marginTop: "20px" }}>
             <h3 className="font-display" style={{ fontSize: "14px", fontWeight: 700, color: "#1e0a3c", letterSpacing: "-0.01em", marginBottom: "10px" }}>
-              Quick News
+              {activeTicker.symbol} News
             </h3>
             <div style={{ display: "flex", gap: "12px" }}>
-              {news.length > 0 ? news.slice(0, 3).map((item) => (
+              {news.length > 0 ? displayNews.map((item) => (
                 <a
                   key={item.url}
                   href={item.url}
@@ -289,8 +311,8 @@ export default function DashboardPage() {
                   <div style={{ fontSize: "11px", color: "#a78bfa", fontWeight: 400 }}>{item.publisher}</div>
                 </a>
               )) : (
-                ["Loading news...", "Loading news...", "Loading news..."].map((h, i) => (
-                  <div key={i} className="glass-card" style={{ flex: 1, padding: "16px 18px", fontSize: "13px", color: "#a78bfa" }}>{h}</div>
+                ["Loading news...", "Loading news...", "Loading news..."].map((h, idx) => (
+                  <div key={idx} className="glass-card" style={{ flex: 1, padding: "16px 18px", fontSize: "13px", color: "#a78bfa" }}>{h}</div>
                 ))
               )}
             </div>
