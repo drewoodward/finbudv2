@@ -1,11 +1,11 @@
 import os
-import google.generativeai as genai
 import yfinance as yf
 from dotenv import load_dotenv
+from google import genai
 
 load_dotenv()
 API_KEY = os.getenv("GEMINI_API_KEY")
-genai.configure(api_key=API_KEY)
+client = genai.Client(api_key=API_KEY)
 
 def get_gemini_explanation(ticker: str, prediction: str, confidence: float, price: float, question: str = None):
     """
@@ -45,9 +45,11 @@ RECENT HEADLINES:
         else:
             prompt = base_context + f"\nTASK: Write a short paragraph (max 3 sentences) explaining WHY the model likely predicted '{prediction}' with {confidence}% confidence. Use the headlines for context. Be direct and educational."
 
-        # 3. Call Gemini
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(prompt)
+        # 3. Call Gemini with new SDK
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt
+        )
         return response.text
 
     except Exception as e:
