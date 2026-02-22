@@ -121,3 +121,20 @@ async def analyze_stock_explanation(request: AnalyzeRequest):
     )
     
     return {"explanation": explanation}
+
+# -- NEWS ENDPOINT -- 
+
+@app.get("/api/news")
+def get_news():
+    import yfinance as yf
+    # Pull news from a broad market ticker
+    ticker = yf.Ticker("SPY")
+    news = ticker.news[:6]  # top 6 stories
+    return {"news": [
+        {
+            "title": item.get("content", {}).get("title", ""),
+            "url": item.get("content", {}).get("canonicalUrl", {}).get("url", ""),
+            "publisher": item.get("content", {}).get("provider", {}).get("displayName", ""),
+        }
+        for item in news
+    ]}

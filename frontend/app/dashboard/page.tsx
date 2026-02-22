@@ -12,13 +12,19 @@ interface Ticker {
   trend: "up" | "down" | "flat";
 }
 
+interface NewsItem {
+  title: string;
+  url: string;
+  publisher: string;
+}
+
 const INITIAL_TICKERS: Ticker[] = [
-  { symbol: "MSFT",  price: "Loading...", signal: "HOLD",  conf: 50, trend: "flat"   },
-  { symbol: "NVDA",  price: "Loading...", signal: "HOLD",  conf: 50, trend: "flat"   },
+  { symbol: "MSFT",  price: "Loading...", signal: "HOLD", conf: 50, trend: "flat" },
+  { symbol: "NVDA",  price: "Loading...", signal: "HOLD", conf: 50, trend: "flat" },
   { symbol: "GOOGL", price: "Loading...", signal: "HOLD", conf: 50, trend: "flat" },
-  { symbol: "AAPL",  price: "Loading...", signal: "HOLD",  conf: 50, trend: "flat"   },
+  { symbol: "AAPL",  price: "Loading...", signal: "HOLD", conf: 50, trend: "flat" },
   { symbol: "TSLA",  price: "Loading...", signal: "HOLD", conf: 50, trend: "flat" },
-  { symbol: "AMZN",  price: "Loading...", signal: "HOLD",  conf: 50, trend: "flat"   },
+  { symbol: "AMZN",  price: "Loading...", signal: "HOLD", conf: 50, trend: "flat" },
   { symbol: "META",  price: "Loading...", signal: "HOLD", conf: 50, trend: "flat" },
 ];
 
@@ -34,7 +40,6 @@ function TrendIcon({ trend, size = 32 }: { trend: string; size?: number }) {
   return <Minus width={size} height={size} style={{ color: "#9ca3af", opacity: 0.6 }} />;
 }
 
-// Helper function to determine trend from signal and confidence
 function determineTrend(signal: string, confidence: number): "up" | "down" | "flat" {
   if (signal === "BUY" && confidence > 60) return "up";
   if (signal === "SELL" && confidence > 60) return "down";
@@ -45,6 +50,7 @@ export default function DashboardPage() {
   const [activeIdx, setActiveIdx] = useState(3); // AAPL default
   const [tickers, setTickers] = useState<Ticker[]>(INITIAL_TICKERS);
   const [loading, setLoading] = useState(true);
+  const [news, setNews] = useState<NewsItem[]>([]); // ← news state lives here
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Fetch live prices and ML predictions
@@ -52,36 +58,26 @@ export default function DashboardPage() {
     const fetchPredictions = async () => {
       try {
         const symbols = INITIAL_TICKERS.map(t => t.symbol).join(',');
-        console.log('🔍 Fetching ML predictions for:', symbols);
-        
         const response = await fetch(`/api/stock-predictions?symbols=${symbols}`);
         const result = await response.json();
-        
-        console.log('📊 ML Predictions received:', result);
-        
         if (result.data) {
           const updatedTickers = INITIAL_TICKERS.map(ticker => {
             const predictionData = result.data[ticker.symbol];
-            
             if (predictionData) {
               return {
                 ...ticker,
                 price: predictionData.price > 0 ? predictionData.price.toFixed(2) : "N/A",
                 signal: predictionData.signal as "BUY" | "HOLD" | "SELL",
                 conf: predictionData.confidence,
-                trend: determineTrend(predictionData.signal, predictionData.confidence)
+                trend: determineTrend(predictionData.signal, predictionData.confidence),
               };
             }
-            
             return { ...ticker, price: "N/A" };
           });
-          
-          console.log('✅ Updated tickers:', updatedTickers);
           setTickers(updatedTickers);
         }
       } catch (error) {
-        console.error('❌ Error fetching predictions:', error);
-        // Keep initial tickers with "Error" if fetch fails
+        console.error("❌ Error fetching predictions:", error);
         setTickers(INITIAL_TICKERS.map(t => ({ ...t, price: "Error" })));
       } finally {
         setLoading(false);
@@ -89,11 +85,16 @@ export default function DashboardPage() {
     };
 
     fetchPredictions();
-    
-    // Refresh predictions every 60 seconds (ML predictions don't need to be updated as frequently)
     const interval = setInterval(fetchPredictions, 60000);
-    
     return () => clearInterval(interval);
+  }, []);
+
+  // Fetch real news from backend
+  useEffect(() => {
+    fetch("http://127.0.0.1:8000/api/news")
+      .then(res => res.json())
+      .then(data => setNews(data.news))
+      .catch(() => console.log("News fetch failed"));
   }, []);
 
   const prev = () => setActiveIdx((i) => Math.max(0, i - 1));
@@ -101,11 +102,10 @@ export default function DashboardPage() {
 
   const activeTicker = tickers[activeIdx];
 
-  // How many cards visible: active center + 1 each side
   const visibleRange = 1;
   const visible = tickers.map((t, i) => ({
     ...t,
-    offset: i - activeIdx,   // -2,-1,0,1,2 relative to center
+    offset: i - activeIdx,
     visible: Math.abs(i - activeIdx) <= visibleRange + 0.5,
   }));
 
@@ -128,21 +128,11 @@ export default function DashboardPage() {
         }}
       >
         {/* ── Left: Brand & Nav ── */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "20px",
-          }}
-        >
-          {/* Brand card */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           <div className="glass-card" style={{ padding: "24px 20px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
               <Leaf style={{ color: "#6d28d9", width: 32, height: 32 }} strokeWidth={2.5} />
-              <span
-                className="font-display"
-                style={{ fontSize: "28px", fontWeight: 800, color: "#1e0a3c", letterSpacing: "-0.03em" }}
-              >
+              <span className="font-display" style={{ fontSize: "28px", fontWeight: 800, color: "#1e0a3c", letterSpacing: "-0.03em" }}>
                 Finbud
               </span>
             </div>
@@ -151,13 +141,12 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          {/* Nav buttons */}
           <div className="glass-card" style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
             {[
               { label: "Dashboard", active: true },
-              { label: "Portfolio", active: false },
-              { label: "Watchlist", active: false },
-              { label: "Analytics", active: false },
+              { label: "Portfolio",  active: false },
+              { label: "Watchlist",  active: false },
+              { label: "Analytics",  active: false },
             ].map((item) => (
               <button
                 key={item.label}
@@ -179,19 +168,14 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          {/* ML Status Indicator */}
           <div className="glass-card" style={{ padding: "16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
               <div style={{
-                width: "8px",
-                height: "8px",
-                borderRadius: "50%",
+                width: "8px", height: "8px", borderRadius: "50%",
                 background: loading ? "#fbbf24" : "#10b981",
-                animation: loading ? "pulse 2s infinite" : "none"
+                animation: loading ? "pulse 2s infinite" : "none",
               }} />
-              <span style={{ fontSize: "12px", fontWeight: 600, color: "#1e0a3c" }}>
-                ML Service
-              </span>
+              <span style={{ fontSize: "12px", fontWeight: 600, color: "#1e0a3c" }}>ML Service</span>
             </div>
             <p style={{ fontSize: "11px", color: "#7c5cbf", lineHeight: 1.4 }}>
               {loading ? "Calculating predictions..." : "Live predictions active"}
@@ -200,64 +184,21 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Center: Carousel ── */}
-        <div
-          ref={containerRef}
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "20px",
-          }}
-        >
-          {/* Header */}
+        <div ref={containerRef} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
-              <h2
-                className="font-display"
-                style={{ fontSize: "24px", fontWeight: 800, color: "#1e0a3c", letterSpacing: "-0.02em", marginBottom: "4px" }}
-              >
+              <h2 className="font-display" style={{ fontSize: "24px", fontWeight: 800, color: "#1e0a3c", letterSpacing: "-0.02em", marginBottom: "4px" }}>
                 Top Stocks
               </h2>
               <p style={{ fontSize: "13px", color: "#7c5cbf" }}>ML-powered buy/sell signals updated in real-time</p>
             </div>
-
-            {/* Nav arrows */}
             <div style={{ display: "flex", gap: "8px" }}>
-              <button
-                onClick={prev}
-                disabled={activeIdx === 0}
-                className="glass-card"
-                style={{
-                  width: "40px",
-                  height: "40px",
-                  padding: 0,
-                  border: "none",
-                  borderRadius: "50%",
-                  cursor: activeIdx === 0 ? "not-allowed" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  opacity: activeIdx === 0 ? 0.3 : 1,
-                }}
-              >
+              <button onClick={prev} disabled={activeIdx === 0} className="glass-card"
+                style={{ width: "40px", height: "40px", padding: 0, border: "none", borderRadius: "50%", cursor: activeIdx === 0 ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: activeIdx === 0 ? 0.3 : 1 }}>
                 <ChevronLeft width={20} height={20} style={{ color: "#6d28d9" }} />
               </button>
-              <button
-                onClick={next}
-                disabled={activeIdx === tickers.length - 1}
-                className="glass-card"
-                style={{
-                  width: "40px",
-                  height: "40px",
-                  padding: 0,
-                  border: "none",
-                  borderRadius: "50%",
-                  cursor: activeIdx === tickers.length - 1 ? "not-allowed" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  opacity: activeIdx === tickers.length - 1 ? 0.3 : 1,
-                }}
-              >
+              <button onClick={next} disabled={activeIdx === tickers.length - 1} className="glass-card"
+                style={{ width: "40px", height: "40px", padding: 0, border: "none", borderRadius: "50%", cursor: activeIdx === tickers.length - 1 ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: activeIdx === tickers.length - 1 ? 0.3 : 1 }}>
                 <ChevronRight width={20} height={20} style={{ color: "#6d28d9" }} />
               </button>
             </div>
@@ -269,15 +210,12 @@ export default function DashboardPage() {
               {visible.map((ticker, i) => {
                 const abs = Math.abs(ticker.offset);
                 if (abs > 1) return null;
-
                 const isCenter = ticker.offset === 0;
                 const colors = SIGNAL_COLORS[ticker.signal];
-
-                // Card geometry
-                const cardW  = isCenter ? 220 : 175;
-                const cardH  = isCenter ? 230 : 182;
+                const cardW = isCenter ? 220 : 175;
+                const cardH = isCenter ? 230 : 182;
                 const translateX = ticker.offset * 195;
-                const scale  = isCenter ? 1 : 0.88;
+                const scale = isCenter ? 1 : 0.88;
                 const zIndex = isCenter ? 10 : 5;
                 const opacity = isCenter ? 1 : 0.82;
 
@@ -286,91 +224,31 @@ export default function DashboardPage() {
                     key={ticker.symbol}
                     onClick={() => !isCenter && setActiveIdx(i + (activeIdx - visibleRange))}
                     style={{
-                      position: "absolute",
-                      top: "50%",
-                      left: "50%",
-                      width: `${cardW}px`,
-                      height: `${cardH}px`,
+                      position: "absolute", top: "50%", left: "50%",
+                      width: `${cardW}px`, height: `${cardH}px`,
                       transform: `translate(-50%, -50%) translateX(${translateX}px) scale(${scale})`,
                       transition: "all 0.4s cubic-bezier(0.34,1.4,0.64,1)",
-                      zIndex,
-                      opacity,
-                      cursor: isCenter ? "default" : "pointer",
+                      zIndex, opacity, cursor: isCenter ? "default" : "pointer",
                     }}
                   >
-                    <div
-                      className="glass-card"
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        padding: "20px",
-                        gap: isCenter ? "6px" : "4px",
-                      }}
-                    >
-                      <h3
-                        className="font-display"
-                        style={{
-                          fontSize: isCenter ? "22px" : "17px",
-                          fontWeight: 800,
-                          color: "#1e0a3c",
-                          letterSpacing: "-0.02em",
-                        }}
-                      >
+                    <div className="glass-card" style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "20px", gap: isCenter ? "6px" : "4px" }}>
+                      <h3 className="font-display" style={{ fontSize: isCenter ? "22px" : "17px", fontWeight: 800, color: "#1e0a3c", letterSpacing: "-0.02em" }}>
                         {ticker.symbol}
                       </h3>
-                      <p
-                        style={{
-                          fontSize: isCenter ? "13px" : "11px",
-                          color: "#7c5cbf",
-                          fontWeight: 400,
-                          marginBottom: isCenter ? "6px" : "4px",
-                        }}
-                      >
+                      <p style={{ fontSize: isCenter ? "13px" : "11px", color: "#7c5cbf", fontWeight: 400, marginBottom: isCenter ? "6px" : "4px" }}>
                         {ticker.price !== "Loading..." && ticker.price !== "Error" ? `$${ticker.price}` : ticker.price} USD
                       </p>
-
                       <div style={{ display: "flex", alignItems: "center", gap: isCenter ? "14px" : "10px" }}>
-                        {/* Signal Circle */}
-                        <div
-                          style={{
-                            width: isCenter ? "88px" : "64px",
-                            height: isCenter ? "88px" : "64px",
-                            borderRadius: "50%",
-                            background: colors.bg,
-                            boxShadow: `0 0 ${isCenter ? 24 : 16}px ${colors.glow}`,
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "2px",
-                            transition: "all 0.3s ease",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: isCenter ? "13px" : "10px",
-                              fontWeight: 700,
-                              lineHeight: 1,
-                            }}
-                          >
-                            {ticker.signal}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: isCenter ? "22px" : "16px",
-                              fontWeight: 800,
-                              lineHeight: 1.1,
-                            }}
-                          >
-                            {ticker.conf}%
-                          </span>
+                        <div style={{
+                          width: isCenter ? "88px" : "64px", height: isCenter ? "88px" : "64px",
+                          borderRadius: "50%", background: colors.bg,
+                          boxShadow: `0 0 ${isCenter ? 24 : 16}px ${colors.glow}`,
+                          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                          gap: "2px", transition: "all 0.3s ease",
+                        }}>
+                          <span style={{ fontSize: isCenter ? "13px" : "10px", fontWeight: 700, lineHeight: 1, color: "white" }}>{ticker.signal}</span>
+                          <span style={{ fontSize: isCenter ? "22px" : "16px", fontWeight: 800, lineHeight: 1.1, color: "white" }}>{ticker.conf}%</span>
                         </div>
-
-                        {/* Trend Icon */}
                         <TrendIcon trend={ticker.trend} size={isCenter ? 30 : 22} />
                       </div>
                     </div>
@@ -380,58 +258,41 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Dots indicator */}
+          {/* Dots */}
           <div style={{ display: "flex", justifyContent: "center", gap: "6px", flexShrink: 0, marginTop: "-8px" }}>
             {tickers.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setActiveIdx(i)}
-                style={{
-                  width: i === activeIdx ? "20px" : "6px",
-                  height: "6px",
-                  borderRadius: "100px",
-                  background: i === activeIdx ? "#6d28d9" : "rgba(109,40,217,0.25)",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: 0,
-                  transition: "all 0.3s cubic-bezier(0.34,1.4,0.64,1)",
-                }}
-              />
+              <button key={i} onClick={() => setActiveIdx(i)} style={{
+                width: i === activeIdx ? "20px" : "6px", height: "6px", borderRadius: "100px",
+                background: i === activeIdx ? "#6d28d9" : "rgba(109,40,217,0.25)",
+                border: "none", cursor: "pointer", padding: 0,
+                transition: "all 0.3s cubic-bezier(0.34,1.4,0.64,1)",
+              }} />
             ))}
           </div>
 
           {/* Quick News */}
           <div style={{ marginTop: "20px" }}>
-            <h3
-              className="font-display"
-              style={{
-                fontSize: "14px",
-                fontWeight: 700,
-                color: "#1e0a3c",
-                letterSpacing: "-0.01em",
-                marginBottom: "10px",
-              }}
-            >
+            <h3 className="font-display" style={{ fontSize: "14px", fontWeight: 700, color: "#1e0a3c", letterSpacing: "-0.01em", marginBottom: "10px" }}>
               Quick News
             </h3>
             <div style={{ display: "flex", gap: "12px" }}>
-              {["Fed Rate Decision Today", "Tech Sector Rally Continues", "Oil Prices Stabilize"].map((h) => (
-                <div
-                  key={h}
+              {news.length > 0 ? news.slice(0, 3).map((item) => (
+                <a
+                  key={item.url}
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="glass-card"
-                  style={{
-                    flex: 1,
-                    padding: "16px 18px",
-                    cursor: "pointer",
-                    fontSize: "13px",
-                    fontWeight: 500,
-                    color: "#3b1f6e",
-                    lineHeight: 1.4,
-                  }}
+                  style={{ flex: 1, padding: "16px 18px", cursor: "pointer", fontSize: "13px", fontWeight: 500, color: "#3b1f6e", lineHeight: 1.4, textDecoration: "none", display: "block" }}
                 >
-                  {h}
-                </div>
-              ))}
+                  <div style={{ marginBottom: "6px" }}>{item.title}</div>
+                  <div style={{ fontSize: "11px", color: "#a78bfa", fontWeight: 400 }}>{item.publisher}</div>
+                </a>
+              )) : (
+                ["Loading news...", "Loading news...", "Loading news..."].map((h, i) => (
+                  <div key={i} className="glass-card" style={{ flex: 1, padding: "16px 18px", fontSize: "13px", color: "#a78bfa" }}>{h}</div>
+                ))
+              )}
             </div>
           </div>
         </div>
