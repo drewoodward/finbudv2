@@ -1,17 +1,25 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import AiAnalystWidget from "@/components/AiAnalystWidget";
 import { Leaf, TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight } from "lucide-react";
 
-const TICKERS = [
-  { symbol: "MSFT",  price: "415.20", signal: "BUY",  conf: 82, trend: "up"   },
-  { symbol: "NVDA",  price: "875.40", signal: "BUY",  conf: 91, trend: "up"   },
-  { symbol: "GOOGL", price: "142.20", signal: "HOLD", conf: 65, trend: "flat" },
-  { symbol: "AAPL",  price: "175.50", signal: "BUY",  conf: 88, trend: "up"   },
-  { symbol: "TSLA",  price: "245.80", signal: "SELL", conf: 40, trend: "down" },
-  { symbol: "AMZN",  price: "185.60", signal: "BUY",  conf: 76, trend: "up"   },
-  { symbol: "META",  price: "505.30", signal: "HOLD", conf: 58, trend: "flat" },
+interface Ticker {
+  symbol: string;
+  price: string;
+  signal: "BUY" | "HOLD" | "SELL";
+  conf: number;
+  trend: "up" | "down" | "flat";
+}
+
+const INITIAL_TICKERS: Ticker[] = [
+  { symbol: "MSFT",  price: "Loading...", signal: "BUY",  conf: 82, trend: "up"   },
+  { symbol: "NVDA",  price: "Loading...", signal: "BUY",  conf: 91, trend: "up"   },
+  { symbol: "GOOGL", price: "Loading...", signal: "HOLD", conf: 65, trend: "flat" },
+  { symbol: "AAPL",  price: "Loading...", signal: "BUY",  conf: 88, trend: "up"   },
+  { symbol: "TSLA",  price: "Loading...", signal: "SELL", conf: 40, trend: "down" },
+  { symbol: "AMZN",  price: "Loading...", signal: "BUY",  conf: 76, trend: "up"   },
+  { symbol: "META",  price: "Loading...", signal: "HOLD", conf: 58, trend: "flat" },
 ];
 
 const SIGNAL_COLORS: Record<string, { bg: string; text: string; glow: string }> = {
@@ -28,16 +36,50 @@ function TrendIcon({ trend, size = 32 }: { trend: string; size?: number }) {
 
 export default function DashboardPage() {
   const [activeIdx, setActiveIdx] = useState(3); // AAPL default
+  const [tickers, setTickers] = useState<Ticker[]>(INITIAL_TICKERS);
+  const [loading, setLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const prev = () => setActiveIdx((i) => Math.max(0, i - 1));
-  const next = () => setActiveIdx((i) => Math.min(TICKERS.length - 1, i + 1));
+  // Fetch live prices from Yahoo Finance
+  useEffect(() => {
+    const fetchPrices = async () => {
+      try {
+        const symbols = INITIAL_TICKERS.map(t => t.symbol).join(',');
+        const response = await fetch(`/api/stock-prices?symbols=${symbols}`);
+        const data = await response.json();
+        
+        if (data.prices) {
+          const updatedTickers = INITIAL_TICKERS.map(ticker => ({
+            ...ticker,
+            price: data.prices[ticker.symbol]?.toFixed(2) || "N/A"
+          }));
+          setTickers(updatedTickers);
+        }
+      } catch (error) {
+        console.error('Error fetching prices:', error);
+        // Keep initial tickers with "Loading..." if fetch fails
+        setTickers(INITIAL_TICKERS.map(t => ({ ...t, price: "Error" })));
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const activeTicker = TICKERS[activeIdx];
+    fetchPrices();
+    
+    // Refresh prices every 30 seconds
+    const interval = setInterval(fetchPrices, 30000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  const prev = () => setActiveIdx((i) => Math.max(0, i - 1));
+  const next = () => setActiveIdx((i) => Math.min(tickers.length - 1, i + 1));
+
+  const activeTicker = tickers[activeIdx];
 
   // How many cards visible: active center + 1 each side
   const visibleRange = 1;
-  const visible = TICKERS.map((t, i) => ({
+  const visible = tickers.map((t, i) => ({
     ...t,
     offset: i - activeIdx,   // -2,-1,0,1,2 relative to center
     visible: Math.abs(i - activeIdx) <= visibleRange + 0.5,
@@ -170,7 +212,7 @@ export default function DashboardPage() {
           {/* Right Arrow */}
           <button
             onClick={next}
-            disabled={activeIdx === TICKERS.length - 1}
+            disabled={activeIdx === tickers.length - 1}
             style={{
               position: "absolute", right: "-8px", zIndex: 20,
               width: "40px", height: "40px", borderRadius: "50%",
@@ -178,8 +220,8 @@ export default function DashboardPage() {
               backdropFilter: "blur(12px)",
               border: "1px solid rgba(255,255,255,0.9)",
               boxShadow: "0 4px 16px rgba(109,40,217,0.12)",
-              cursor: activeIdx === TICKERS.length - 1 ? "not-allowed" : "pointer",
-              opacity: activeIdx === TICKERS.length - 1 ? 0.4 : 1,
+              cursor: activeIdx === tickers.length - 1 ? "not-allowed" : "pointer",
+              opacity: activeIdx === tickers.length - 1 ? 0.4 : 1,
               display: "flex", alignItems: "center", justifyContent: "center",
               transition: "all 0.2s",
               color: "#4c1d95",
@@ -254,7 +296,7 @@ export default function DashboardPage() {
                         marginBottom: isCenter ? "6px" : "4px",
                       }}
                     >
-                      {ticker.price} USD
+                      {ticker.price !== "Loading..." && ticker.price !== "Error" ? `$${ticker.price}` : ticker.price} USD
                     </p>
 
                     <div style={{ display: "flex", alignItems: "center", gap: isCenter ? "14px" : "10px" }}>
@@ -300,7 +342,7 @@ export default function DashboardPage() {
 
         {/* Dots indicator */}
         <div style={{ display: "flex", justifyContent: "center", gap: "6px", flexShrink: 0, marginTop: "-8px" }}>
-          {TICKERS.map((_, i) => (
+          {tickers.map((_, i) => (
             <button
               key={i}
               onClick={() => setActiveIdx(i)}
@@ -324,7 +366,7 @@ export default function DashboardPage() {
             ticker={activeTicker.symbol}
             prediction={activeTicker.signal}
             confidence={activeTicker.conf}
-            price={parseFloat(activeTicker.price)}
+            price={parseFloat(activeTicker.price) || 0}
           />
         </div>
 
