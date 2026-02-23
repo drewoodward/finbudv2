@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import AiAnalystWidget from "@/components/AiAnalystWidget";
+import AiAnalystWidget from "@/components/AIAnalystWidget";
 import { Leaf, TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface Ticker {
